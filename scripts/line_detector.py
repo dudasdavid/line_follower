@@ -7,15 +7,22 @@ from cv_bridge import CvBridge, CvBridgeError
 import message_filters
 import rospy
 from sensor_msgs.msg import Image, CompressedImage
+from std_msgs.msg import Int16MultiArray
 try:
     from queue import Queue
 except ImportError:
     from Queue import Queue
 import numpy as np
-
-from geometry_msgs.msg import Twist
+import math
 
 withDisplay = False
+
+x_width = 128
+x_offset = -4
+y_height = 45
+y_offset = 72
+threshold_value = 200 # 60 for black line
+binary_inverted = False
 
 class BufferQueue(Queue):
     """Slight modification of the standard Queue that discards the oldest item
@@ -45,12 +52,14 @@ class DisplayThread(threading.Thread):
         self.queue = queue
         self.image = None
         self.image_pub = rospy.Publisher("/line_image/image_raw", Image, queue_size=1)
+        self.maskImage_pub = rospy.Publisher("/line_image/mask_raw", Image, queue_size=1)
         # self.image_pub = rospy.Publisher("/line_image/image_raw/compressed", CompressedImage, queue_size=1)
         
 
     def run(self):
         if withDisplay:
             cv2.namedWindow("display", cv2.WINDOW_NORMAL)
+            cv2.namedWindow("mask", cv2.WINDOW_NORMAL)
         # cv2.setMouseCallback("display", self.opencv_calibration_node.on_mouse)
         # cv2.createTrackbar("Camera type: \n 0 : pinhole \n 1 : fisheye", "display", 0,1, self.opencv_calibration_node.on_model_change)
         # cv2.createTrackbar("scale", "display", 0, 100, self.opencv_calibration_node.on_scale)
@@ -59,9 +68,10 @@ class DisplayThread(threading.Thread):
             # print(self.queue.qsize())
             if self.queue.qsize() > 0:
                 self.image = self.queue.get()
-                processedImage = processImage(self.image, isDry = False)
+                processedImage, maskImage = processImage(self.image, isDry = False)
                 if withDisplay:
                     cv2.imshow("display", processedImage)
+                    cv2.imshow("mask", maskImage)
                 
                 try:
                     # msg = CompressedImage()
@@ -72,11 +82,12 @@ class DisplayThread(threading.Thread):
                     # self.image_pub.publish(msg)
                 
                     self.image_pub.publish(bridge.cv2_to_imgmsg(processedImage, "bgr8"))
+                    self.maskImage_pub.publish(bridge.cv2_to_imgmsg(maskImage, "bgr8"))
                 except CvBridgeError as e:
                     print(e)
                 
             else:
-                time.sleep(0.1)
+                time.sleep(0.01)
                 
             k = cv2.waitKey(6) & 0xFF
             if k in [27, ord('q')]:
@@ -101,7 +112,12 @@ def processImage(img, isDry = False):
     start_time = time.clock()
     
     height, width = img.shape[:2]
-    cropImg = img[170:215, 92:220]
+    
+    if height != 240 or width != 320:
+        dim = (320, 240)
+        img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+    
+    cropImg = img[int((240-y_height)/2 + y_offset):int((240+y_height)/2 + y_offset), int((320-x_width)/2 + x_offset):int((320+x_width)/2 + x_offset)]
     monoImg = cv2.cvtColor(cropImg, cv2.COLOR_RGB2GRAY)
     
     rows,cols = cropImg.shape[:2]
@@ -109,13 +125,18 @@ def processImage(img, isDry = False):
     # Gaussian blur
     blurImg = cv2.GaussianBlur(monoImg,(5,5),0)
     # Color thresholding
-    # ret,threshImg = cv2.threshold(blurImg,60,255,cv2.THRESH_BINARY_INV)
-    ret,threshImg = cv2.threshold(blurImg,200,255,cv2.THRESH_BINARY)
+    if binary_inverted:
+        ret,threshImg = cv2.threshold(blurImg,threshold_value,255,cv2.THRESH_BINARY_INV)
+    else:
+        ret,threshImg = cv2.threshold(blurImg,threshold_value,255,cv2.THRESH_BINARY)
+        
     # Erode and dilate to remove accidental line detections
     mask = cv2.erode(threshImg, None, iterations=2)
     mask = cv2.dilate(mask, None, iterations=2)
     # Find the contours of the frame
     contours,hierarchy = cv2.findContours(mask.copy(), 1, cv2.CHAIN_APPROX_NONE)
+    
+    
     # Find the biggest contour (if detected)
     if len(contours) > 0:
         c = max(contours, key=cv2.contourArea)
@@ -129,40 +150,35 @@ def processImage(img, isDry = False):
     
         
         [vx,vy,x,y] = cv2.fitLine(c, cv2.DIST_L2,0,0.01,0.01)
-        lefty = int((-x*vy/vx) + y)
-        righty = int(((cols-x)*vy/vx)+y)
+        # lefty = int((-x*vy/vx) + y)
+        # righty = int(((cols-x)*vy/vx)+y)
+        
+        angle = math.atan2(vy,vx)
+        if angle < 0:
+            angle = angle + math.pi / 2
+        else:
+            angle = angle - math.pi / 2
+        
+        angle *= -1
+        
+        # print(math.degrees(angle))
         # cv2.line(cropImg,(cols-1,righty),(0,lefty),(0,0,255),1)
-        
-        if cx >= 100:
-            vel_msg.angular.z = -0.3
-
-        if cx < 100 and cx > 70:
-            vel_msg.angular.z = 0
-
-        if cx <= 70:
-            vel_msg.angular.z = 0.3
-        
-        vel_msg.linear.x = 0.2
+        cv2.line(cropImg, (int(cx-math.cos(angle - math.pi / 2)*100), int(cy+math.sin(angle - math.pi / 2 )*100)), (int(cx+math.cos(angle - math.pi / 2)*100), int(cy-math.sin(angle - math.pi / 2 )*100)), (0,0,255), 1)
+            
+        array_to_send.data = [cols, 1, cx, angle]
+    
         
     else:
-        vel_msg.linear.x = 0
-        vel_msg.angular.z = 0
-        
-    velocity_publisher.publish(vel_msg)
-    returnImg = cropImg
-    # returnImg = cv2.cvtColor(threshImg, cv2.COLOR_GRAY2RGB)
+        array_to_send.data = [cols, 0, 0, 0]
     
-    return returnImg
+    pubLine.publish(array_to_send)   
+    
+    maskImage = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
+    return cropImg, maskImage
 
-velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=3)
-vel_msg = Twist()
-vel_msg.linear.x = 0
-vel_msg.linear.y = 0
-vel_msg.linear.z = 0
-vel_msg.angular.x = 0
-vel_msg.angular.y = 0
-vel_msg.angular.z = 0
 
+pubLine = rospy.Publisher('line_data', Int16MultiArray, queue_size=1)
+array_to_send = Int16MultiArray()
 
 queue_size = 1      
 q_mono = BufferQueue(queue_size)

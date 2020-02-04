@@ -1,10 +1,18 @@
 <launch>
-  <node pkg="line_follower" type="line_follow.py" name="line_follower" clear_params="true" output="screen"> 
+  <node pkg="line_follower" type="line_detector.py" name="line_detector" clear_params="true" output="screen"> 
   </node>
   
-  <node name="republish" type="republish" pkg="image_transport" output="screen" args="raw in:=/line_image/image_raw  out:=/line_image/image_compressed" />
+  <node pkg="line_follower" type="line_controller.py" name="line_controller" clear_params="true" output="screen"> 
+  </node>
+  
+  <node name="republish_line" type="republish" pkg="image_transport" output="screen" args="raw in:=/line_image/image_raw  out:=/line_image/image_compressed" />
+  <node name="republish_mask" type="republish" pkg="image_transport" output="screen" args="raw in:=/line_image/mask_raw  out:=/line_image/mask_compressed" />
   
   <param name="/line_image/image_compressed/compressed/format" type="string" value="jpeg" />
   <param name="/line_image/image_compressed/compressed/jpeg_quality" type="int" value="30" />
   <param name="/line_image/image_compressed/compressed/png_level" type="int" value="9" />
+  
+  <param name="/line_image/mask_compressed/compressed/format" type="string" value="jpeg" />
+  <param name="/line_image/mask_compressed/compressed/jpeg_quality" type="int" value="30" />
+  
 </launch>
