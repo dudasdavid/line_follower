@@ -1,0 +1,10 @@
+<launch>
+  <node pkg="line_follower" type="line_follow.py" name="line_follower" clear_params="true" output="screen"> 
+  </node>
+  
+  <node name="republish" type="republish" pkg="image_transport" output="screen" args="raw in:=/line_image/image_raw  out:=/line_image/image_compressed" />
+  
+  <param name="/line_image/image_compressed/compressed/format" type="string" value="jpeg" />
+  <param name="/line_image/image_compressed/compressed/jpeg_quality" type="int" value="30" />
+  <param name="/line_image/image_compressed/compressed/png_level" type="int" value="9" />
+</launch>
