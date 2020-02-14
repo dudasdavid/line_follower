@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import Twist
 import rospy
 
-P = 0.015
+P_angle = 1.0
+P_linear = 0.008
 
 def controlRobot(data):
     xmax = data.data[0]
@@ -13,11 +14,14 @@ def controlRobot(data):
     angle = data.data[3]
     
     if valid:
-        vel_msg.angular.z = P * -(xval - xmax/2)
+        print(angle)
+        vel_msg.angular.z = P_angle * (angle)
+        vel_msg.linear.y = P_linear * -(xval - xmax/2)
         
-        vel_msg.linear.x = 0.3
+        vel_msg.linear.x = 0.4
     else:
         vel_msg.linear.x = 0
+        vel_msg.linear.y = 0
         vel_msg.angular.z = 0
         
     velocity_publisher.publish(vel_msg)
@@ -32,6 +36,6 @@ vel_msg.angular.y = 0
 vel_msg.angular.z = 0
 
 rospy.init_node('line_follower', anonymous=True)
-rospy.Subscriber('line_data', Int16MultiArray, controlRobot)
+rospy.Subscriber('line_data', Float32MultiArray, controlRobot)
 
 rospy.spin()

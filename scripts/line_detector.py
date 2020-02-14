@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import threading
 import time
@@ -7,7 +7,7 @@ from cv_bridge import CvBridge, CvBridgeError
 import message_filters
 import rospy
 from sensor_msgs.msg import Image, CompressedImage
-from std_msgs.msg import Int16MultiArray
+from std_msgs.msg import Float32MultiArray
 try:
     from queue import Queue
 except ImportError:
@@ -16,6 +16,7 @@ import numpy as np
 import math
 
 withDisplay = False
+withSave = False
 
 x_width = 128
 x_offset = -4
@@ -64,6 +65,8 @@ class DisplayThread(threading.Thread):
         # cv2.createTrackbar("Camera type: \n 0 : pinhole \n 1 : fisheye", "display", 0,1, self.opencv_calibration_node.on_model_change)
         # cv2.createTrackbar("scale", "display", 0, 100, self.opencv_calibration_node.on_scale)
         
+        imageIndex = 0
+        path = "/home/david/Pictures/saves/"
         while True:
             # print(self.queue.qsize())
             if self.queue.qsize() > 0:
@@ -82,6 +85,11 @@ class DisplayThread(threading.Thread):
                     # self.image_pub.publish(msg)
                 
                     self.image_pub.publish(bridge.cv2_to_imgmsg(processedImage, "bgr8"))
+                    if withSave:
+                        cv2.imwrite(path + str(imageIndex) + ".jpg", processedImage)
+                        print("file saved")
+                        imageIndex+=1
+                        time.sleep(0.5)
                     self.maskImage_pub.publish(bridge.cv2_to_imgmsg(maskImage, "bgr8"))
                 except CvBridgeError as e:
                     print(e)
@@ -143,9 +151,10 @@ def processImage(img, isDry = False):
         M = cv2.moments(c)
         cx = int(M['m10']/M['m00'])
         cy = int(M['m01']/M['m00'])
-        cv2.line(cropImg,(cx,0),(cx,rows),(255,0,0),1)
-        cv2.line(cropImg,(0,cy),(cols,cy),(255,0,0),1)
-        cv2.drawContours(cropImg, contours, -1, (0,255,0), 1)
+        if not withSave:
+            cv2.line(cropImg,(cx,0),(cx,rows),(255,0,0),1)
+            cv2.line(cropImg,(0,cy),(cols,cy),(255,0,0),1)
+            cv2.drawContours(cropImg, contours, -1, (0,255,0), 1)
     
     
         
@@ -163,7 +172,8 @@ def processImage(img, isDry = False):
         
         # print(math.degrees(angle))
         # cv2.line(cropImg,(cols-1,righty),(0,lefty),(0,0,255),1)
-        cv2.line(cropImg, (int(cx-math.cos(angle - math.pi / 2)*100), int(cy+math.sin(angle - math.pi / 2 )*100)), (int(cx+math.cos(angle - math.pi / 2)*100), int(cy-math.sin(angle - math.pi / 2 )*100)), (0,0,255), 1)
+        if not withSave:
+            cv2.line(cropImg, (int(cx-math.cos(angle - math.pi / 2)*100), int(cy+math.sin(angle - math.pi / 2 )*100)), (int(cx+math.cos(angle - math.pi / 2)*100), int(cy-math.sin(angle - math.pi / 2 )*100)), (0,0,255), 1)
             
         array_to_send.data = [cols, 1, cx, angle]
     
@@ -177,8 +187,8 @@ def processImage(img, isDry = False):
     return cropImg, maskImage
 
 
-pubLine = rospy.Publisher('line_data', Int16MultiArray, queue_size=1)
-array_to_send = Int16MultiArray()
+pubLine = rospy.Publisher('line_data', Float32MultiArray, queue_size=1)
+array_to_send = Float32MultiArray()
 
 queue_size = 1      
 q_mono = BufferQueue(queue_size)
