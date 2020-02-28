@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="line_follower" type="save_traning_pictures.py" name="image_saver" clear_params="true" output="screen"> 
+  </node>
+  
+</launch>
