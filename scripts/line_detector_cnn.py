@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import threading
 import time
 import cv2
@@ -7,7 +6,7 @@ from cv_bridge import CvBridge, CvBridgeError
 import message_filters
 import rospy
 from sensor_msgs.msg import Image, CompressedImage
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Int16MultiArray
 try:
     from queue import Queue
 except ImportError:
@@ -15,24 +14,19 @@ except ImportError:
 import numpy as np
 import math
 
-from keras.preprocessing.image import img_to_array
-from keras.models import load_model
-from keras.backend import set_session
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.models import load_model
+from tensorflow.keras.backend import set_session
 import tensorflow as tf
 import os, sys, imutils, argparse
 
 
-from geometry_msgs.msg import Twist
-
 withDisplay = False
-withSave = False
 
 x_width = 128
 x_offset = -4
 y_height = 45
 y_offset = 72
-threshold_value = 200 # 60 for black line
-binary_inverted = False
 
 class BufferQueue(Queue):
     """Slight modification of the standard Queue that discards the oldest item
@@ -69,7 +63,6 @@ class DisplayThread(threading.Thread):
     def run(self):
         if withDisplay:
             cv2.namedWindow("display", cv2.WINDOW_NORMAL)
-            cv2.namedWindow("mask", cv2.WINDOW_NORMAL)
         # cv2.setMouseCallback("display", self.opencv_calibration_node.on_mouse)
         # cv2.createTrackbar("Camera type: \n 0 : pinhole \n 1 : fisheye", "display", 0,1, self.opencv_calibration_node.on_model_change)
         # cv2.createTrackbar("scale", "display", 0, 100, self.opencv_calibration_node.on_scale)
@@ -80,11 +73,10 @@ class DisplayThread(threading.Thread):
             # print(self.queue.qsize())
             if self.queue.qsize() > 0:
                 self.image = self.queue.get()
-                processedImage, maskImage = processImage(self.image, isDry = False)
-                '''
+                processedImage = processImage(self.image, isDry = False)
+                
                 if withDisplay:
                     cv2.imshow("display", processedImage)
-                    cv2.imshow("mask", maskImage)
                 
                 try:
                     # msg = CompressedImage()
@@ -95,15 +87,9 @@ class DisplayThread(threading.Thread):
                     # self.image_pub.publish(msg)
                 
                     self.image_pub.publish(bridge.cv2_to_imgmsg(processedImage, "bgr8"))
-                    if withSave:
-                        cv2.imwrite(path + str(imageIndex) + ".jpg", processedImage)
-                        print("file saved")
-                        imageIndex+=1
-                        time.sleep(0.5)
-                    self.maskImage_pub.publish(bridge.cv2_to_imgmsg(maskImage, "bgr8"))
                 except CvBridgeError as e:
                     print(e)
-                '''
+                
             else:
                 time.sleep(0.01)
                 
@@ -140,27 +126,16 @@ def processImage(img, isDry = False):
         with session.graph.as_default():
             prediction = np.argmax(model.predict(image))
             
-            if prediction == 1:
-                print("left")
-                vel_msg.angular.z = -0.1
-                vel_msg.linear.x = 0.05
-            elif prediction == 2:
-                print("right")
-                vel_msg.angular.z = 0.1
-                vel_msg.linear.x = 0.05
-            else:
-                print("forward")
-                vel_msg.angular.z = 0
-                vel_msg.linear.x = 0.1
+    array_to_send.data = [prediction]
+    pubLine.publish(array_to_send) 
 
-    velocity_publisher.publish(vel_msg)
     print(time.clock()-start_time)
     
-    return 0, 0
+    return cropImg
 
 
-pubLine = rospy.Publisher('line_data', Float32MultiArray, queue_size=1)
-array_to_send = Float32MultiArray()
+pubLine = rospy.Publisher('line_data', Int16MultiArray, queue_size=1)
+array_to_send = Int16MultiArray()
 
 queue_size = 1      
 q_mono = BufferQueue(queue_size)
@@ -184,18 +159,10 @@ session = tf.Session(config=config)
 
 set_session(session)
 
-model = load_model("/home/david/catkin_ws/src/line_follower/extras/model")
+model = load_model("/home/david/catkin_ws/src/line_follower/extras/model_jetson")
 model._make_predict_function()
 
 
-velocity_publisher = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-vel_msg = Twist()
-vel_msg.linear.x = 0
-vel_msg.linear.y = 0
-vel_msg.linear.z = 0
-vel_msg.angular.x = 0
-vel_msg.angular.y = 0
-vel_msg.angular.z = 0
 
 rospy.init_node('image_listener')
 # Define your image topic

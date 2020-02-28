@@ -4,8 +4,8 @@ from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import Twist
 import rospy
 
-P_angle = 1.0
-P_linear = 0.008
+P_angle = 1.3
+P_linear = 0.006
 
 def controlRobot(data):
     xmax = data.data[0]
@@ -15,10 +15,10 @@ def controlRobot(data):
     
     if valid:
         print(angle)
-        vel_msg.angular.z = P_angle * (angle)
+        vel_msg.angular.z = P_angle * (angle) + P_linear * -(xval - xmax/2)
         vel_msg.linear.y = P_linear * -(xval - xmax/2)
         
-        vel_msg.linear.x = 0.4
+        vel_msg.linear.x = 0.35
     else:
         vel_msg.linear.x = 0
         vel_msg.linear.y = 0

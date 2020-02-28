@@ -21,12 +21,11 @@ import os, sys, imutils, argparse
 withDisplay = False
 withSave = True
 
-x_width = 200 #200
-x_offset = -4
-y_height = 45
-y_offset = 72
-threshold_value = 200 # 60 for black line
-binary_inverted = False
+x_width = 128 #200  ## this should be a parameter
+x_offset = -4  ## this should be a parameter
+y_height = 45  ## this should be a parameter
+y_offset = 72  ## this should be a parameter
+
 
 class BufferQueue(Queue):
     """Slight modification of the standard Queue that discards the oldest item
@@ -62,7 +61,8 @@ class DisplayThread(threading.Thread):
             cv2.namedWindow("display", cv2.WINDOW_NORMAL)
         
         imageIndex = 0
-        path = "/home/pi/Pictures/saves/"
+        # path = "/home/pi/Pictures/saves/"  ## this should be a parameter
+        path = "/home/david/Pictures/saves/"  ## this should be a parameter
         while True:
             if self.queue.qsize() > 0:
                 self.image = self.queue.get()
@@ -90,7 +90,8 @@ class DisplayThread(threading.Thread):
 def queue_monocular(msg):
         try:
             # Convert your ROS Image message to OpenCV2
-            cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
+            # cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="mono8") ## this should be a parameter
+            cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except CvBridgeError as e:
             print(e)
         else:
