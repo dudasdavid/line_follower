@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
 import threading
+print('1')
 import time
+print('2')
 import cv2
+print('3')
 from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge, CvBridgeError
+print('4')
 import message_filters
 import rospy
 from sensor_msgs.msg import Image
@@ -61,8 +66,8 @@ class DisplayThread(threading.Thread):
             cv2.namedWindow("display", cv2.WINDOW_NORMAL)
         
         imageIndex = 0
-        # path = "/home/pi/Pictures/saves/"  ## this should be a parameter
-        path = "/home/david/Pictures/saves/"  ## this should be a parameter
+        path = "/home/pi/Pictures/saves/"  ## this should be a parameter
+        # path = "/home/david/Pictures/saves/"  ## this should be a parameter
         while True:
             if self.queue.qsize() > 0:
                 self.image = self.queue.get()
@@ -122,7 +127,8 @@ bridge = CvBridge()
 
 rospy.init_node('image_listener')
 # Define your image topic
-image_topic = "/main_camera/image_raw"
+# image_topic = "/main_camera/image_raw"
+image_topic = "/raspicam_node/image"
 # Set up your subscriber and define its callback
 rospy.Subscriber(image_topic, Image, queue_monocular)
 # Spin until ctrl + c
