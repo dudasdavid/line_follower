@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="line_follower" type="line_detector_cnn_pi.py" name="line_detector" clear_params="true" output="screen"> 
+  </node>
+  
+  
+</launch>

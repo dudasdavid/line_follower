@@ -90,7 +90,7 @@ class DisplayThread(threading.Thread):
                     print(e)
                 
             else:
-                time.sleep(0.01)
+                time.sleep(0.02)
                 
             k = cv2.waitKey(6) & 0xFF
             if k in [27, ord('q')]:

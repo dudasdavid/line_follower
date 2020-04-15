@@ -16,6 +16,7 @@ import random
 import cv2
 import os
 import matplotlib
+import matplotlib.pyplot as plt
 
 
 class LeNet:
@@ -131,14 +132,14 @@ INIT_LR = 1e-3
 BS = 32# initialize the model
 print("[INFO] compiling model...")
 #model = LeNet.build(width=28, height=28, depth=1, classes=4)
-model = CustomNet.build(width=28, height=28, depth=1, classes=4)
+model = LeNet.build(width=28, height=28, depth=1, classes=4)
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="binary_crossentropy", optimizer=opt,
     metrics=["accuracy"])
  
 # train the network
 print("[INFO] training network...")
-H = model.fit(trainX, trainY, batch_size=BS,
+history = model.fit(trainX, trainY, batch_size=BS,
     validation_data=(testX, testY),# steps_per_epoch=len(trainX) // BS,
     epochs=EPOCHS, verbose=1)
  
@@ -147,6 +148,15 @@ print("[INFO] serializing network...")
 model.save("model_pi")
 
 print(np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
+
+plt.xlabel('Epoch Number')
+plt.ylabel("Loss / Accuracy Magnitude")
+plt.plot(history.history['loss'], label="loss")
+plt.plot(history.history['acc'], label="acc")
+plt.plot(history.history['val_loss'], label="val_loss")
+plt.plot(history.history['val_acc'], label="val_acc")
+plt.legend()
+plt.show()
 
 
 
