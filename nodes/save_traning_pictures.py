@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 
 import threading
-print('1')
 import time
-print('2')
 import cv2
-print('3')
 from cv_bridge import CvBridge, CvBridgeError
-from cv_bridge import CvBridge, CvBridgeError
-print('4')
 import message_filters
 import rospy
 from sensor_msgs.msg import Image
@@ -22,15 +17,16 @@ import math
 
 import os, sys, imutils, argparse
 
+withDisplay = bool(int(rospy.get_param('~with_display', 0)))
+withSave = bool(int(rospy.get_param('~with_save', 1)))
 
-withDisplay = False
-withSave = True
+isMono = bool(int(rospy.get_param('~mono', 1)))
+saveTime = float(rospy.get_param('~save_time', 0.5))
 
-x_width = 128 #200  ## this should be a parameter
-x_offset = -4  ## this should be a parameter
-y_height = 45  ## this should be a parameter
-y_offset = 72  ## this should be a parameter
-
+x_width = int(rospy.get_param('~x_width', 200))
+x_offset = int(rospy.get_param('~x_offset', 0))
+y_height = int(rospy.get_param('~y_height', 45))
+y_offset = int(rospy.get_param('~y_offset', 72))
 
 class BufferQueue(Queue):
     """Slight modification of the standard Queue that discards the oldest item
@@ -48,7 +44,7 @@ class BufferQueue(Queue):
             self.not_empty.notify()
 
 
-class DisplayThread(threading.Thread):
+class ImageThread(threading.Thread):
     """
     Thread that displays the current images
     It is its own thread so that all display can be done
@@ -66,19 +62,18 @@ class DisplayThread(threading.Thread):
             cv2.namedWindow("display", cv2.WINDOW_NORMAL)
         
         imageIndex = 0
-        path = "/home/pi/Pictures/saves/"  ## this should be a parameter
+        path = rospy.get_param('~save_path')  ## this should be a parameter
         # path = "/home/david/Pictures/saves/"  ## this should be a parameter
         while True:
             if self.queue.qsize() > 0:
                 self.image = self.queue.get()
                 processedImage = processImage(self.image, isDry = False)
-                
-                
+
                 if withSave:
                     cv2.imwrite(path + str(imageIndex) + ".jpg", processedImage)
                     print("file saved")
                     imageIndex+=1
-                    time.sleep(0.5)
+                    time.sleep(saveTime)
                 
                 if withDisplay:
                     cv2.imshow("display", processedImage)
@@ -95,8 +90,10 @@ class DisplayThread(threading.Thread):
 def queue_monocular(msg):
         try:
             # Convert your ROS Image message to OpenCV2
-            # cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="mono8") ## this should be a parameter
-            cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            if isMono:
+                cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
+            else:
+                cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except CvBridgeError as e:
             print(e)
         else:
@@ -108,17 +105,23 @@ def processImage(img, isDry = False):
         return img
     
     start_time = time.clock()
-    
+
+    height, width = img.shape[:2]
+
+    if height != 240 or width != 320:
+        dim = (320, 240)
+        img = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
+
     cropImg = img[int((240-y_height)/2 + y_offset):int((240+y_height)/2 + y_offset), int((320-x_width)/2 + x_offset):int((320+x_width)/2 + x_offset)]
     # cropImg = cv2.cvtColor(cropImg, cv2.COLOR_GRAY2RGB)
     
     return cropImg
     
 
-queue_size = 1      
+queue_size = 1
 q_mono = BufferQueue(queue_size)
 
-display_thread = DisplayThread(q_mono)
+display_thread = ImageThread(q_mono)
 display_thread.setDaemon(True)
 display_thread.start()
 
@@ -128,7 +131,7 @@ bridge = CvBridge()
 rospy.init_node('image_listener')
 # Define your image topic
 # image_topic = "/main_camera/image_raw"
-image_topic = "/raspicam_node/image"
+image_topic = rospy.get_param('~image_topic')
 # Set up your subscriber and define its callback
 rospy.Subscriber(image_topic, Image, queue_monocular)
 # Spin until ctrl + c

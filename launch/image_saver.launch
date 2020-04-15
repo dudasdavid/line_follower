@@ -1,5 +1,18 @@
+<?xml version="1.0"?>
 <launch>
+
   <node pkg="line_follower" type="save_traning_pictures.py" name="image_saver" clear_params="true" output="screen"> 
+    <param name="with_display" value="0"/>
+    <param name="with_save" value="1"/>
+    <param name="mono" value="0"/>
+    <param name="save_time" value="0.5"/>
+    <param name="x_width" value="200"/>
+    <param name="x_offset" value="0"/>
+    <param name="y_height" value="45"/>
+    <param name="y_offset" value="72"/>
+    <param name="save_path" value="/home/pi/Pictures/saves/"/>
+    <param name="image_topic" value="/raspicam_node/image"/>
+    
   </node>
   
 </launch>
