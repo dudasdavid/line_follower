@@ -15,3 +15,6 @@ catkin_install_python(PROGRAMS nodes/line_controller.py
   nodes/save_traning_pictures.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch)

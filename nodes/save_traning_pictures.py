@@ -17,16 +17,7 @@ import math
 
 import os, sys, imutils, argparse
 
-withDisplay = bool(int(rospy.get_param('~with_display', 0)))
-withSave = bool(int(rospy.get_param('~with_save', 1)))
 
-isMono = bool(int(rospy.get_param('~mono', 1)))
-saveTime = float(rospy.get_param('~save_time', 0.5))
-
-x_width = int(rospy.get_param('~x_width', 200))
-x_offset = int(rospy.get_param('~x_offset', 0))
-y_height = int(rospy.get_param('~y_height', 45))
-y_offset = int(rospy.get_param('~y_offset', 72))
 
 class BufferQueue(Queue):
     """Slight modification of the standard Queue that discards the oldest item
@@ -62,8 +53,7 @@ class ImageThread(threading.Thread):
             cv2.namedWindow("display", cv2.WINDOW_NORMAL)
         
         imageIndex = 0
-        path = rospy.get_param('~save_path')  ## this should be a parameter
-        # path = "/home/david/Pictures/saves/"  ## this should be a parameter
+        
         while True:
             if self.queue.qsize() > 0:
                 self.image = self.queue.get()
@@ -117,6 +107,20 @@ def processImage(img, isDry = False):
     
     return cropImg
     
+rospy.init_node('image_listener')
+
+withDisplay = bool(int(rospy.get_param('~with_display', 0)))
+withSave = bool(int(rospy.get_param('~with_save', 1)))
+
+isMono = bool(int(rospy.get_param('~mono', 1)))
+saveTime = float(rospy.get_param('~save_time', 0.5))
+
+x_width = int(rospy.get_param('~x_width', 200))
+x_offset = int(rospy.get_param('~x_offset', 0))
+y_height = int(rospy.get_param('~y_height', 45))
+y_offset = int(rospy.get_param('~y_offset', 72))
+
+path = str(rospy.get_param('~save_path'))  ## this should be a parameter
 
 queue_size = 1
 q_mono = BufferQueue(queue_size)
@@ -128,7 +132,7 @@ display_thread.start()
 bridge = CvBridge()
 
 
-rospy.init_node('image_listener')
+
 # Define your image topic
 # image_topic = "/main_camera/image_raw"
 image_topic = rospy.get_param('~image_topic')
