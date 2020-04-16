@@ -8,6 +8,7 @@ from keras.preprocessing.image import img_to_array
 from keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
+import tensorflow as tf
 from imutils import paths
 import numpy as np
 import argparse
@@ -15,6 +16,7 @@ import random
 import cv2
 import os
 import matplotlib
+import matplotlib.pyplot as plt
 
 
 class LeNet:
@@ -46,7 +48,37 @@ class LeNet:
     
     # return the constructed network architecture
     return model
-    
+
+
+class CustomNet:
+    @staticmethod
+    def build(width, height, depth, classes):
+        # initialize the model
+        model = Sequential()
+        inputShape = (height, width, depth)
+
+        # first set of CONV => RELU => POOL layers
+        model.add(Conv2D(2, (5, 5), padding="same", use_bias=False,
+                         input_shape=inputShape))
+        model.add(Activation("relu"))
+        model.add(MaxPooling2D(pool_size=(4, 4), strides=(4, 4)))
+
+        # second set of CONV => RELU => POOL layers
+        model.add(Conv2D(4, (5, 5), padding="same", use_bias=False))
+        model.add(Activation("relu"))
+        model.add(MaxPooling2D(pool_size=(3, 3), strides=(3, 3)))
+
+        # first (and only) set of FC => RELU layers
+        model.add(Flatten())
+        model.add(Dense(32))
+        model.add(Activation("relu"))
+
+        # softmax classifier
+        model.add(Dense(classes))
+        model.add(Activation("softmax"))
+
+        # return the constructed network architecture
+        return model
     
 dataset = './/images_pi'
 # initialize the data and labels
@@ -95,10 +127,11 @@ testY = to_categorical(testY, num_classes=4)
 
 # initialize the number of epochs to train for, initial learning rate,
 # and batch size
-EPOCHS = 15
+EPOCHS = 30
 INIT_LR = 1e-3
 BS = 32# initialize the model
 print("[INFO] compiling model...")
+#model = LeNet.build(width=28, height=28, depth=1, classes=4)
 model = LeNet.build(width=28, height=28, depth=1, classes=4)
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="binary_crossentropy", optimizer=opt,
@@ -106,13 +139,24 @@ model.compile(loss="binary_crossentropy", optimizer=opt,
  
 # train the network
 print("[INFO] training network...")
-H = model.fit(trainX, trainY, batch_size=BS,
+history = model.fit(trainX, trainY, batch_size=BS,
     validation_data=(testX, testY),# steps_per_epoch=len(trainX) // BS,
     epochs=EPOCHS, verbose=1)
  
 # save the model to disk
 print("[INFO] serializing network...")
 model.save("model_pi")
+
+print(np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
+
+plt.xlabel('Epoch Number')
+plt.ylabel("Loss / Accuracy Magnitude")
+plt.plot(history.history['loss'], label="loss")
+plt.plot(history.history['acc'], label="acc")
+plt.plot(history.history['val_loss'], label="val_loss")
+plt.plot(history.history['val_acc'], label="val_acc")
+plt.legend()
+plt.show()
 
 
 

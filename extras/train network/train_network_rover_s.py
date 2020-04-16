@@ -80,7 +80,7 @@ class CustomNet:
         # return the constructed network architecture
         return model
     
-dataset = './/images_pi'
+dataset = './/images_rover_s'
 # initialize the data and labels
 print("[INFO] loading images...")
 data = []
@@ -95,7 +95,7 @@ for imagePath in imagePaths:
     # load the image, pre-process it, and store it in the data list
     image = cv2.imread(imagePath)
     image = cv2.resize(image, (28, 28))
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    #image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     image = img_to_array(image)
     data.append(image)
     # extract the class label from the image path and update the
@@ -127,12 +127,12 @@ testY = to_categorical(testY, num_classes=4)
 
 # initialize the number of epochs to train for, initial learning rate,
 # and batch size
-EPOCHS = 30
+EPOCHS = 40
 INIT_LR = 1e-3
 BS = 32# initialize the model
 print("[INFO] compiling model...")
 #model = LeNet.build(width=28, height=28, depth=1, classes=4)
-model = LeNet.build(width=28, height=28, depth=1, classes=4)
+model = CustomNet.build(width=28, height=28, depth=3, classes=4)
 opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
 model.compile(loss="binary_crossentropy", optimizer=opt,
     metrics=["accuracy"])
@@ -145,7 +145,7 @@ history = model.fit(trainX, trainY, batch_size=BS,
  
 # save the model to disk
 print("[INFO] serializing network...")
-model.save("model_pi")
+model.save("model_rover_s")
 
 print(np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
 
