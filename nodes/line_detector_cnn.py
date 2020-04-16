@@ -21,13 +21,6 @@ import tensorflow as tf
 import os, sys, imutils, argparse
 
 
-withDisplay = False
-
-x_width = 128
-x_offset = -4
-y_height = 45
-y_offset = 72
-
 class BufferQueue(Queue):
     """Slight modification of the standard Queue that discards the oldest item
     when adding an item and the queue is full.
@@ -56,8 +49,6 @@ class DisplayThread(threading.Thread):
         self.queue = queue
         self.image = None
         self.image_pub = rospy.Publisher("/line_image/image_raw", Image, queue_size=1)
-        self.maskImage_pub = rospy.Publisher("/line_image/mask_raw", Image, queue_size=1)
-        # self.image_pub = rospy.Publisher("/line_image/image_raw/compressed", CompressedImage, queue_size=1)
         
 
     def run(self):
@@ -66,9 +57,7 @@ class DisplayThread(threading.Thread):
         # cv2.setMouseCallback("display", self.opencv_calibration_node.on_mouse)
         # cv2.createTrackbar("Camera type: \n 0 : pinhole \n 1 : fisheye", "display", 0,1, self.opencv_calibration_node.on_model_change)
         # cv2.createTrackbar("scale", "display", 0, 100, self.opencv_calibration_node.on_scale)
-        
-        imageIndex = 0
-        path = "/home/david/Pictures/saves/"
+
         while True:
             # print(self.queue.qsize())
             if self.queue.qsize() > 0:
@@ -102,7 +91,10 @@ class DisplayThread(threading.Thread):
 def queue_monocular(msg):
         try:
             # Convert your ROS Image message to OpenCV2
-            cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            if isMono:
+                cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
+            else:
+                cv2_img = bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except CvBridgeError as e:
             print(e)
         else:
@@ -114,13 +106,22 @@ def processImage(img, isDry = False):
         return img
     
     start_time = time.clock()
+
+    height, width = img.shape[:2]
+
+    if height != 240 or width != 320:
+        dim = (320, 240)
+        img = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
     
     cropImg = img[int((240-y_height)/2 + y_offset):int((240+y_height)/2 + y_offset), int((320-x_width)/2 + x_offset):int((320+x_width)/2 + x_offset)]
     
     image = cv2.resize(cropImg, (28, 28))
     image = img_to_array(image)
     image = np.array(image, dtype="float") / 255.0
-    image = image.reshape(-1, 28, 28, 3)
+    if isMono:
+        image = image.reshape(-1, 28, 28, 1)
+    else:
+        image = image.reshape(-1, 28, 28, 3)
     
     with session.as_default():
         with session.graph.as_default():
@@ -134,8 +135,20 @@ def processImage(img, isDry = False):
     return cropImg
 
 
+
 pubLine = rospy.Publisher('line_data', Int16MultiArray, queue_size=1)
 array_to_send = Int16MultiArray()
+
+rospy.init_node('image_listener')
+
+withDisplay = bool(int(rospy.get_param('~with_display', 0)))
+withGPU = bool(int(rospy.get_param('~with_GPU', 0)))
+isMono = bool(int(rospy.get_param('~mono', 1)))
+
+x_width = int(rospy.get_param('~x_width', 200))
+x_offset = int(rospy.get_param('~x_offset', 0))
+y_height = int(rospy.get_param('~y_height', 45))
+y_offset = int(rospy.get_param('~y_offset', 72))
 
 queue_size = 1      
 q_mono = BufferQueue(queue_size)
@@ -146,27 +159,32 @@ display_thread.start()
 
 bridge = CvBridge()
 
-config = tf.ConfigProto(
-    device_count={'GPU': 1},
-    intra_op_parallelism_threads=1,
-    allow_soft_placement=True
-)
+if withGPU:
+    config = tf.ConfigProto(
+        device_count={'GPU': 1},
+        intra_op_parallelism_threads=1,
+        allow_soft_placement=True
+    )
 
-config.gpu_options.allow_growth = True
-config.gpu_options.per_process_gpu_memory_fraction = 0.6
+    config.gpu_options.allow_growth = True
+    config.gpu_options.per_process_gpu_memory_fraction = 0.6
+
+else:
+    config = tf.ConfigProto(
+        intra_op_parallelism_threads=1,
+        allow_soft_placement=True
+    )
 
 session = tf.Session(config=config)
 
 set_session(session)
 
-model = load_model("/home/david/catkin_ws/src/line_follower/extras/model_jetson")
+path = str(rospy.get_param('~model_path'))  ## this should be a parameter
+model = load_model(path)
 model._make_predict_function()
 
-
-
-rospy.init_node('image_listener')
 # Define your image topic
-image_topic = "/main_camera/image_raw"
+image_topic = rospy.get_param('~image_topic')
 # Set up your subscriber and define its callback
 rospy.Subscriber(image_topic, Image, queue_monocular)
 # Spin until ctrl + c

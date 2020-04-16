@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="line_follower" type="line_detector_cnn.py" name="line_detector" clear_params="true" output="screen"> 
+    <param name="~with_display" value="0"/>
+    <param name="~with_GPU" value="0"/>
+    <param name="~mono" value="0"/>
+    <param name="~x_width" value="260"/>
+    <param name="~x_offset" value="15"/>
+    <param name="~y_height" value="45"/>
+    <param name="~y_offset" value="72"/>
+    <param name="~model_path" value="/home/pi/catkin_ws/src/line_follower/extras/model_rover_s"/>
+    <param name="~image_topic" value="/raspicam_node/image"/>
+  </node>
+  
+  
+</launch>
