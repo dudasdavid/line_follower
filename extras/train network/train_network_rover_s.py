@@ -147,14 +147,15 @@ history = model.fit(trainX, trainY, batch_size=BS,
 print("[INFO] serializing network...")
 model.save("model_rover_s")
 
-print(np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
+#print(np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()]))
+model.summary()
 
 plt.xlabel('Epoch Number')
 plt.ylabel("Loss / Accuracy Magnitude")
 plt.plot(history.history['loss'], label="loss")
-plt.plot(history.history['acc'], label="acc")
+plt.plot(history.history['accuracy'], label="acc")
 plt.plot(history.history['val_loss'], label="val_loss")
-plt.plot(history.history['val_acc'], label="val_acc")
+plt.plot(history.history['val_accuracy'], label="val_acc")
 plt.legend()
 plt.show()
 
